@@ -1,0 +1,26 @@
+# Node.js .dockerignore
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+README.md
+LICENSE
+.vscode
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Build directories
+dist
+build
+# Various log files
+*.log
+# Editor directories and files
+.idea
+*.swp
+*.swo
+*.sublime-workspace

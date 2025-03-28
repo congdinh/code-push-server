@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  codepush-api:
+    image: codepush-api
+    restart: always
+    build: ./api
+    ports:
+      - '127.0.0.1:9007:3000'
+    volumes:
+      - ./api/.env:/usr/src/app/.env
+      - ./temp:/usr/src/app/temp
+    networks:
+      - external
+
+  # codepush-cli:
+  #   image: codepush-cli
+  #   restart: always
+  #   build: ./cli
+  #   # command: ['yarn', 'start']
+  #   networks:
+  #     - external
+
+  # codepush-redis:
+  #   image: redis:4-alpine # Compare with node_module "redis": "2.4.2"
+  #   restart: always
+  #   command: redis-server --save 20 1 --loglevel warning --requirepass Nami123
+  #   networks:
+  #     - external
+
+networks:
+  external:
+    name: codepush_network

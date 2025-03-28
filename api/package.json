@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node ./bin/script/server.js",
     "start:env": "node -r dotenv/config ./bin/script/server.js dotenv_config_path=.env dotenv_config_silent=true",
+    "dev": "ts-node-dev --respawn --transpile-only -r dotenv/config ./script/server.ts dotenv_config_path=.env",
     "clean": "rimraf bin",
     "build": "tsc && shx cp -r ./script/views ./bin/script",
     "prettier": "prettier --write \"./**/*.ts\"",
@@ -69,6 +70,7 @@
     "rimraf": "^5.0.1",
     "shx": "^0.3.4",
     "supertest": "^6.3.3",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.4"
   }
 }
