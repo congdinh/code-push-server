@@ -57,6 +57,18 @@ export function getManagementRouter(config: ManagementConfig): Router {
   const router: Router = Router();
   const nameResolver: NameResolver = new NameResolver(config.storage);
 
+  router.get("/user", (req: Request, res: Response, next: (err?: any) => void): any => {
+    const accountId: string = req.user.id;
+    storage
+      .getAccount(accountId)
+      .then((storageAccount: storageTypes.Account) => {
+        const restAccount: restTypes.Account = converterUtils.toRestAccount(storageAccount);
+        res.send({ account: restAccount });
+      })
+      .catch((error: error.CodePushError) => errorUtils.restErrorHandler(res, error, next))
+      .done();
+  });
+
   router.get("/account", (req: Request, res: Response, next: (err?: any) => void): any => {
     const accountId: string = req.user.id;
     storage
@@ -743,6 +755,7 @@ export function getManagementRouter(config: ManagementConfig): Router {
         }
 
         if (updateRelease) {
+          console.log("getManagementRouter->updateRelease", {updateRelease, packageToUpdate});
           return storage.updatePackageHistory(accountId, appId, storageDeployment.id, packageHistory).then(() => {
             res.send({ package: converterUtils.toRestPackage(packageToUpdate) });
             return invalidateCachedPackage(storageDeployment.key);
@@ -946,6 +959,7 @@ export function getManagementRouter(config: ManagementConfig): Router {
         return nameResolver.resolveDeployment(accountId, appId, deploymentName);
       })
       .then((deployment: storageTypes.Deployment): Promise<storageTypes.Package[]> => {
+
         return storage.getPackageHistory(accountId, appId, deployment.id);
       })
       .then((packageHistory: storageTypes.Package[]) => {
@@ -972,10 +986,13 @@ export function getManagementRouter(config: ManagementConfig): Router {
           return nameResolver.resolveDeployment(accountId, appId, deploymentName);
         })
         .then((deployment: storageTypes.Deployment): Promise<redis.DeploymentMetrics> => {
+          console.log("deployment-metric-getMetricsWithDeploymentKey: ", deployment);
           return redisManager.getMetricsWithDeploymentKey(deployment.key);
         })
         .then((metrics: redis.DeploymentMetrics) => {
           const deploymentMetrics: restTypes.DeploymentMetrics = converterUtils.toRestDeploymentMetrics(metrics);
+          console.log("deployment-metric-deploymentMetrics: ", deploymentMetrics);
+
           res.send({ metrics: deploymentMetrics });
         })
         .catch((error: error.CodePushError) => errorUtils.restErrorHandler(res, error, next))
@@ -1261,6 +1278,8 @@ export function getManagementRouter(config: ManagementConfig): Router {
         return storage.getPackageHistory(accountId, appId, deploymentId);
       })
       .then((history: storageTypes.Package[]) => {
+        console.log("addDiffInfoForPackage->appPackage: ", appPackage);
+        console.log("addDiffInfoForPackage->diffPackageMap: ", diffPackageMap);
         if (history) {
           for (let i = history.length - 1; i >= 0; i--) {
             if (history[i].label === appPackage.label && !history[i].diffPackageMap) {
@@ -1294,13 +1313,70 @@ export function getManagementRouter(config: ManagementConfig): Router {
     }
 
     console.log(`Processing package: ${appPackage.label}`);
+    console.log("processDiff->accountId: ", accountId);
+    console.log("processDiff->appId: ", appId);
+    console.log("processDiff->deploymentId: ", deploymentId);
+    console.log("processDiff->appPackage: ", appPackage);
+
+    if(process.env.DISABLE_DIFF_PACKAGE_FOR_DEPLOYMENT_IDS?.includes(deploymentId)) {
+      console.log(`Diffing is disabled for deploymentId: ${deploymentId}`);
+      return q(<void>null);
+    }
 
     return packageDiffing
       .generateDiffPackageMap(accountId, appId, deploymentId, appPackage)
       .then((diffPackageMap: storageTypes.PackageHashToBlobInfoMap) => {
+        console.log("processDiff->diffPackageMap: ", diffPackageMap);
         console.log(`Package processed, adding diff info`);
+        if(process.env.CLONE_DIFF_PACKAGE_FOR_DEPLOYMENT_IDS?.includes(deploymentId)) {
+          console.log("processDiff->diffPackageMap-deploymentId: ", diffPackageMap);
+          // Test For IOS App: clone url primary full blob package to all item of diffPackageMap
+          const clonePrimaryPackage = Object.keys(diffPackageMap).reduce((acc, key) => {
+            acc[key] = {
+              // ...diffPackageMap[key],
+              size: appPackage.size,
+              url: appPackage.blobUrl
+            }
+            return acc;
+          }, {});
+          console.log("processDiff->diffPackageMap-clonePrimaryPackage: ", clonePrimaryPackage);
+          return addDiffInfoForPackage(accountId, appId, deploymentId, appPackage, clonePrimaryPackage);
+        }
         addDiffInfoForPackage(accountId, appId, deploymentId, appPackage, diffPackageMap);
       });
+  }
+
+  router.get("/testDiff", (req: Request, res: Response, next: (err?: any) => void): any => {
+    testDiff()
+      .then(() => {
+        res.sendStatus(200);
+      })
+      .catch((error: error.CodePushError) => errorUtils.restErrorHandler(res, error, next))
+      .finally();
+  });
+
+  async function testDiff() {
+    const accountId: string = "NkC4M6ksZg";
+    const appId: string = "N12BzakiZx";
+    const deploymentId: string = "VkkqGayiZe";
+    const appPackage: storageTypes.Package = {
+      "description": "",
+      "isDisabled": false,
+      "isMandatory": false,
+      "rollout": 100,
+      "appVersion": "1.0",
+      "packageHash": "8432e04ba160f7303d699b787b627f6ebebde4398a1b5faab2343584405d0008",
+      "blobUrl": "https://storage.blob.core.windows.net/storagev2/9XE9FeLM_yM43oRP4GijTcXzrXpwV11LR5EhZx",
+      "size": 234978,
+      "manifestBlobUrl": "https://storage.blob.core.windows.net/storagev2/gwr5HqW0r1TJ95Ed1Lf59UEIAKdDV11LR5EhZx",
+      "releaseMethod": "Upload",
+      "uploadTime": 1742450699374,
+      "label": "v3",
+      "releasedBy": ""
+    };
+    const diffPackageMap = await processDiff(accountId, appId, deploymentId, appPackage);
+
+    return true;
   }
 
   return router;

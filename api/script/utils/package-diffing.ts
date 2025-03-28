@@ -40,6 +40,12 @@ export class PackageDiffer {
   constructor(storage: storageTypes.Storage, maxPackagesToDiff?: number) {
     this._maxPackagesToDiff = maxPackagesToDiff || 1;
     this._storage = storage;
+    console.log("WORK_DIRECTORY_PATH: " + PackageDiffer.WORK_DIRECTORY_PATH);
+    console.log("IS_WORK_DIRECTORY_CREATED: " + PackageDiffer.IS_WORK_DIRECTORY_CREATED);
+    console.log('_maxPackagesToDiff: ', this._maxPackagesToDiff);
+    console.log('_storage: ',this._storage);
+    // Init work directory
+    PackageDiffer.ensureWorkDirectoryExists();
   }
 
   public generateDiffPackageMap(
@@ -53,6 +59,10 @@ export class PackageDiffer {
         diffErrorUtils.diffError(diffErrorUtils.ErrorCode.InvalidArguments, "Package information missing")
       );
     }
+    console.log('generateDiffPackageMap->accountId: ', accountId);
+    console.log('generateDiffPackageMap->appId: ', appId);
+    console.log('generateDiffPackageMap->deploymentId: ', deploymentId);
+    console.log('generateDiffPackageMap->newPackage: ', newPackage);
 
     const manifestPromise: Promise<PackageManifest> = this.getManifest(newPackage);
     const historyPromise: Promise<storageTypes.Package[]> = this._storage.getPackageHistory(accountId, appId, deploymentId);
@@ -69,6 +79,7 @@ export class PackageDiffer {
           newPackage.packageHash,
           newPackage.label
         );
+        console.log('generateDiffPackageMap->packagesToDiff: ', packagesToDiff);
         const diffBlobInfoPromises: Promise<DiffBlobInfo>[] = [];
         if (packagesToDiff) {
           packagesToDiff.forEach((appPackage: storageTypes.Package) => {
@@ -104,6 +115,7 @@ export class PackageDiffer {
   public generateDiffArchive(oldManifest: PackageManifest, newManifest: PackageManifest, newArchiveFilePath: string): Promise<string> {
     return Promise<string>(
       (resolve: (value?: string | Promise<string>) => void, reject: (reason: any) => void, notify: (progress: any) => void): void => {
+        console.log('generateDiffArchive->newArchiveFilePath: ', newArchiveFilePath);
         if (!oldManifest || !newManifest) {
           resolve(null);
           return;
@@ -119,10 +131,12 @@ export class PackageDiffer {
         PackageDiffer.ensureWorkDirectoryExists();
 
         const diffFilePath = path.join(PackageDiffer.WORK_DIRECTORY_PATH, "diff_" + PackageDiffer.randomString(20) + ".zip");
+        console.log('generateDiffArchive->diffFilePath: ', diffFilePath);
         const writeStream: stream.Writable = fs.createWriteStream(diffFilePath);
         const diffFile = new yazl.ZipFile();
 
         diffFile.outputStream.pipe(writeStream).on("close", (): void => {
+          console.log('generateDiffArchive->close: ', diffFilePath);
           resolve(diffFilePath);
         });
 
@@ -166,16 +180,18 @@ export class PackageDiffer {
                   readStream
                     .on("error", (error: any): void => {
                       readStreamError = error;
+                      console.error("generateDiffArchive->readStreamError1: ", readStreamError);
                       reject(error);
                     })
                     .on("end", (): void => {
                       readStreamCounter--;
                       if (readStreamCounter === 0 && !readStreamError) {
                         // All read streams have completed successfully
+                        console.log('generateDiffArchive->readStreamCounter: ', {diffFilePath, readStreamCounter});
                         resolve(diffFilePath);
                       }
                     });
-
+                  console.log('generateDiffArchive->entry.fileName: ', entry);
                   diffFile.addReadStream(readStream, entry.fileName);
                 });
 
@@ -183,8 +199,13 @@ export class PackageDiffer {
                   if (readStreamCounter === 0) {
                     // All read streams have completed, no need to wait
                     if (readStreamError) {
+                      console.error("generateDiffArchive->readStreamError2: ", readStreamError);
                       reject(readStreamError);
                     } else {
+                      // All read streams have completed successfully
+                      console.log('generateDiffArchive->diffFile: ', diffFile);
+                      // Todo: add resolve with diffFilePath
+                      // resolve();
                       resolve(diffFilePath);
                       diffFile.end();
                     }
@@ -193,6 +214,8 @@ export class PackageDiffer {
               });
           });
         } else {
+          console.log('generateDiffArchive->diffFile2: ', diffFile);
+          resolve(diffFilePath);
           diffFile.end();
         }
       }
@@ -257,6 +280,7 @@ export class PackageDiffer {
       })
       .then((diffArchiveFilePath?: string): Promise<storageTypes.BlobInfo> => {
         if (diffArchiveFilePath) {
+          console.log('uploadAndGetDiffBlobInfo->diffArchiveFilePath: ', diffArchiveFilePath);
           return this.uploadDiffArchiveBlob(security.generateSecureKey(accountId), diffArchiveFilePath);
         }
 
@@ -264,6 +288,7 @@ export class PackageDiffer {
       })
       .then((blobInfo: storageTypes.BlobInfo) => {
         if (blobInfo) {
+          console.log('uploadAndGetDiffBlobInfo->blobInfo: ', blobInfo);
           return { packageHash: appPackage.packageHash, blobInfo: blobInfo };
         } else {
           return q<DiffBlobInfo>(null);
@@ -278,7 +303,7 @@ export class PackageDiffer {
           resolve(null);
           return;
         }
-
+        console.log('getManifest->appPackage: ', appPackage);
         const req: superagent.Request<any> = superagent.get(appPackage.manifestBlobUrl);
         const writeStream = new stream.Writable();
         let json = "";
@@ -290,7 +315,6 @@ export class PackageDiffer {
 
         req.pipe(writeStream).on("finish", () => {
           const manifest: PackageManifest = PackageManifest.deserialize(json);
-
           resolve(manifest);
         });
       }
@@ -325,7 +349,10 @@ export class PackageDiffer {
     if (!history || !history.length) {
       return null;
     }
-
+    console.log('getPackagesToDiff->appVersion: ', appVersion);
+    console.log('getPackagesToDiff->newPackageHash: ', newPackageHash);
+    console.log('getPackagesToDiff->newPackageLabel: ', newPackageLabel);
+    // console.log('getPackagesToDiff->history: ', history);
     // We assume that the new package has been released and already is in history.
     // Only pick the packages that are released before the new package to generate diffs.
     let foundNewPackageInHistory: boolean = false;
@@ -345,7 +372,7 @@ export class PackageDiffer {
         validPackages.push(history[i]);
       }
     }
-
+    console.log('getPackagesToDiff->validPackages: ', validPackages);
     // maintain the order of release.
     return validPackages.reverse();
   }
