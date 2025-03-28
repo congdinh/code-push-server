@@ -118,29 +118,39 @@ code-push-standalone rollback App_Android Production v4
 
 # Login/Register
 
+```
 code-push-standalone login https://codepush.domain.com
 code-push-standalone register https://codepush.domain.com
+```
 
 # Get Deployment App
 
+```
 code-push-standalone deployment ls App_Android --format json
 code-push-standalone deployment ls App_IOS --format json
+```
 
 # GET Metric
 
+```
 code-push-standalone deployment ls App_IOS --format json
+```
 
 # GET detail histories array of builds, list build packages
 
+```
 code-push-standalone deployment history App_IOS Test --format json
 code-push-standalone deployment history App_Android Test --format json
+```
 
 # Mobile Deploy CLI
 
+```
 "ios-check-env": "code-push-standalone deployment ls App_IOS --format json",
 "ios-update-content":"code-push-standalone patch App_IOS Test --des \"description\"",
 "ios-push":"code-push-standalone release-react App_IOS ios -d Test -t 2 -p ios/App/Info.plist -o ios/build",
 "ios-disabled-latest_bundle":"code-push-standalone patch App_IOS Test --disabled true"
+```
 
 # Link Mobile check latest version:
 
