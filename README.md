@@ -1,37 +1,149 @@
-# Visual Studio App Center CodePush Standalone Version
+# CodePush Server Selfhost
 
-[CodePush](https://learn.microsoft.com/en-us/appcenter/distribution/codepush/) is an App Center feature that enables React Native developers to deploy mobile app updates directly to their users’ devices. It consists of two parts: CodePush Server where developers can publish app updates to (e.g. JS, HTML, CSS or image changes), and [CodePush React Native Client SDK](https://github.com/Microsoft/react-native-code-push) that enables querying for updates from within an app.
+The CodePush Server is a Node.js application that powers the CodePush Service. It allows users to deploy and manage over-the-air updates for their react-native applications in a self-hosted environment.
 
-We announced that Visual Studio App Center will be retired on March 31, 2025. You can learn more about the support timeline and alternatives on https://aka.ms/appcenter/retire. In order to let developers keep using CodePush functionality after App Center is fully retired, we created a standalone version of CodePush Server that can be deployed and used independently from App Center itself. Code of this standalone version can be found in this repository. It is fully compatible with [CodePush React Native Client SDK](https://github.com/Microsoft/react-native-code-push).
+Please refer to [react-native-code-push](https://github.com/microsoft/react-native-code-push) for instructions on how to onboard your application to CodePush.
 
+Documents:
 
-## Getting Started
+1. [Azure Readme](./AZURE_README.md)
+2. [Codepush Readme](./CODEPUSH_README.md)
+3. [Environment](./api/ENVIRONMENT.md)
+4. [Security](./api/SECURITY.md)
 
-### CodePush Server
+## Setup
 
-The CodePush server, located in the `api` subdirectory, allows developers to build, deploy and manage CodePush updates themselves.
-For detailed information about the CodePush server, including installation instructions and usage details, please refer to the [CodePush Server README](./api/README.md).
+The CodePush CLI is a Node.js application that allows users
+Download CodePush CLI
 
+1. Clone the CodePush Service repository.
+2. Install the necessary dependencies by running npm install.
+3. Build the CLI by running npm run build.
+4. Install CLI globally by running npm install -g.
 
-### CodePush CLI
+## Authentication
 
-The CodePush CLI, located in `cli` subdirectory, is a command-line tool that allows developers to interact with the CodePush server. For detailed information about the CodePush CLI, including installation instructions and usage details, please refer to the [CodePush CLI README](./cli/README.md).
+Register and log in to your self-hosted CodePush server:
 
+```
+code-push-standalone register https://codepush.domain.com
+code-push-standalone login https://codepush.domain.com
+```
 
-## Contributing
+## Retrieve Deployment Information
 
-While we cannot accept contributions or issues in this repository; however, as a permissively licensed open-source project, it is ready for community development and forks independently.
+List all deployments of an app in JSON format:
 
+```
+code-push-standalone deployment ls [app name] --format json
+```
 
-## Support
+Example:
 
-This code is provided “as is”, because of that Microsoft will not provide support services for it.
+```
+code-push-standalone deployment ls App_iOS --format json
+```
 
+## Retrieve Deployment History
 
-## Legal Notice
+Get the history of bundle updates for a specific deployment:
 
-Microsoft grants you access to the code in this repository under the MIT License, see the [LICENSE](./LICENSE) to learn more.
+```
+code-push-standalone deployment history [app name] [deployment] --format json
+```
 
-Microsoft, Windows, Microsoft Azure and/or other Microsoft products and services referenced in the documentation may be either trademarks or registered trademarks of Microsoft in the United States and/or other countries. The license for this code does not grant you rights to use any Microsoft names, logos, or trademarks. Go to [Microsoft Trademark and Brand Guidelines](http://go.microsoft.com/fwlink/?LinkID=254653) for more information.
+Example:
 
-Privacy information can be found at https://privacy.microsoft.com/.
+```
+code-push-standalone deployment history App_Android Staging --format json
+```
+
+## Disable a Bundle Deployment by ID
+
+Disable or enable a specific bundle version:
+
+```
+code-push-standalone patch [app name] [deployment] -l [id] --disabled [true | false]
+```
+
+Example:
+
+```
+code-push-standalone patch App_Android Production -l v5 --disabled true
+```
+
+## Change Deployment Description by ID
+
+Update the description of a specific bundle version:
+
+```
+code-push-standalone patch [app name] [deployment] -l [id] --des [string description]
+```
+
+Example:
+
+```
+code-push-standalone patch App_Android Production -l v5 --des ""
+```
+
+## Promote a Bundle Between Deployments
+
+Move a bundle from one deployment to another:
+
+```
+code-push-standalone promote [app name] [current deployment] [new deployment] -l [id]
+```
+
+Example:
+
+```
+code-push-standalone promote App_Android Test Staging -l v1
+```
+
+## Rollback to a Previous Version
+
+Revert to a previous bundle version in case of issues:
+
+```
+code-push-standalone rollback [app name] [deployment] [target_label]
+```
+
+Example:
+
+```
+code-push-standalone rollback App_Android Production v4
+```
+
+## Other CLI
+
+# Login/Register
+
+code-push-standalone login https://codepush.domain.com
+code-push-standalone register https://codepush.domain.com
+
+# Get Deployment App
+
+code-push-standalone deployment ls App_Android --format json
+code-push-standalone deployment ls App_IOS --format json
+
+# GET Metric
+
+code-push-standalone deployment ls App_IOS --format json
+
+# GET detail histories array of builds, list build packages
+
+code-push-standalone deployment history App_IOS Test --format json
+code-push-standalone deployment history App_Android Test --format json
+
+# Mobile Deploy CLI
+
+"ios-check-env": "code-push-standalone deployment ls App_IOS --format json",
+"ios-update-content":"code-push-standalone patch App_IOS Test --des \"description\"",
+"ios-push":"code-push-standalone release-react App_IOS ios -d Test -t 2 -p ios/App/Info.plist -o ios/build",
+"ios-disabled-latest_bundle":"code-push-standalone patch App_IOS Test --disabled true"
+
+# Link Mobile check latest version:
+
+> https://codepush.domain.com/v0.1/public/codepush/update_check?deployment_key=123&app_version=2&package_hash=51934f904055eb885118c72a80ba2e6074f535cd01e824a43558fa759d1598db&label=v2&client_unique_id=C8C86AFF-4278-48DF-93B8-DCCAA6D8D16A
+
+> https://codepush.domain.com/v0.1/public/codepush/update_check?deployment_key=123&app_version=2&client_unique_id=7296922cc0491f47
